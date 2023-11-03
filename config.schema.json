@@ -1,0 +1,45 @@
+{
+  "pluginAlias": "knx-weather",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "ip": {
+      "title": "KNX Router or Interface",
+      "type": "string",
+      "placeholder": "224.0.23.12",
+      "description": "IP of the KNX Router."
+    },
+    "port": {
+      "title": "KNX Port",
+      "type": "string",
+      "placeholder": "3671",
+      "description": "KNX Port"
+    },
+    "latitude": {
+      "title": "Latitude",
+      "type": "number",
+      "placeholder": "51.790986",
+      "description": "Latitude"
+    },
+    "longitude": {
+      "title": "Longitude",
+      "type": "number",
+      "placeholder": "9.436365",
+      "description": "Longitude"
+    }
+  },
+  "layout": [
+    {
+      "type": "section",
+      "title": "Global",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "ip",
+        "port",
+        "latitude",
+        "longitude"
+      ]
+    }
+  ]
+}
