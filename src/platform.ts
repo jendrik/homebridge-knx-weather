@@ -2,18 +2,16 @@ import { API, StaticPlatformPlugin, Logger, PlatformConfig, AccessoryPlugin, Ser
 
 import { Connection } from 'knx';
 
-import { WeatherAccessory } from './accessory';
+import { WeatherAccessory } from './accessory.js';
 
 
 export class WeatherPlatform implements StaticPlatformPlugin {
-  public readonly Service: typeof Service = this.api.hap.Service;
-  public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
-  public readonly uuid: typeof uuid = this.api.hap.uuid;
+  public readonly Service: typeof Service;
+  public readonly Characteristic: typeof Characteristic;
+  public readonly uuid: typeof uuid;
 
   public readonly latitude: number;
   public readonly longitude: number;
-
-  public readonly fakeGatoHistoryService;
 
   public readonly connection: Connection;
 
@@ -24,6 +22,10 @@ export class WeatherPlatform implements StaticPlatformPlugin {
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
+    this.Service = api.hap.Service;
+    this.Characteristic = api.hap.Characteristic;
+    this.uuid = api.hap.uuid;
+
     this.latitude = config.latitude;
     this.longitude = config.longitude;
 

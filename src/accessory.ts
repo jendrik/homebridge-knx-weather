@@ -1,10 +1,8 @@
 import { AccessoryPlugin, PlatformConfig, Service } from 'homebridge';
 
-import { Datapoint } from 'knx';
+import { PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DISPLAY_NAME } from './settings.js';
 
-import { PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DISPLAY_NAME } from './settings';
-
-import { WeatherPlatform } from './platform';
+import { WeatherPlatform } from './platform.js';
 
 import SunCalc from 'suncalc';
 
