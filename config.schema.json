@@ -6,8 +6,9 @@
     "ip": {
       "title": "KNX Router or Interface",
       "type": "string",
+      "default": "224.0.23.12",
       "placeholder": "224.0.23.12",
-      "description": "IP of the KNX Router."
+      "description": "IP address of the KNX router or interface."
     },
     "port": {
       "title": "KNX Port",
@@ -16,19 +17,25 @@
       "minimum": 1,
       "maximum": 65535,
       "placeholder": 3671,
-      "description": "KNX Port"
+      "description": "Port of the KNX router or interface."
     },
     "latitude": {
       "title": "Latitude",
       "type": "number",
-      "placeholder": "51.790986",
-      "description": "Latitude"
+      "minimum": -90,
+      "maximum": 90,
+      "required": true,
+      "placeholder": 51.790986,
+      "description": "Latitude of the location used for solar phase calculation."
     },
     "longitude": {
       "title": "Longitude",
       "type": "number",
-      "placeholder": "9.436365",
-      "description": "Longitude"
+      "minimum": -180,
+      "maximum": 180,
+      "required": true,
+      "placeholder": 9.436365,
+      "description": "Longitude of the location used for solar phase calculation."
     }
   },
   "layout": [

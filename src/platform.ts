@@ -1,18 +1,15 @@
-import { API, StaticPlatformPlugin, Logger, PlatformConfig, AccessoryPlugin, Service, Characteristic, uuid } from 'homebridge';
-
+import { API, AccessoryPlugin, Characteristic, Logger, PlatformConfig, Service, StaticPlatformPlugin, uuid } from 'homebridge';
 import { Connection } from 'knx';
 
+import { parseWeatherConfig, type WeatherConfig } from './config.js';
 import { WeatherAccessory } from './accessory.js';
-
 
 export class WeatherPlatform implements StaticPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
   public readonly uuid: typeof uuid;
 
-  public readonly latitude: number;
-  public readonly longitude: number;
-
+  public readonly weatherConfig: WeatherConfig;
   public readonly connection: Connection;
 
   private readonly devices: WeatherAccessory[] = [];
@@ -25,31 +22,36 @@ export class WeatherPlatform implements StaticPlatformPlugin {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
     this.uuid = api.hap.uuid;
-
-    this.latitude = config.latitude;
-    this.longitude = config.longitude;
+    this.weatherConfig = parseWeatherConfig(config);
 
     // connect
     this.connection = new Connection({
-      ipAddr: config.ip ?? '224.0.23.12',
-      ipPort: config.port ?? 3671,
+      ipAddr: this.weatherConfig.ip,
+      ipPort: this.weatherConfig.port,
       handlers: {
-        connected: function () {
+        connected: () => {
           log.info('KNX connected');
         },
-        error: function (connstatus: unknown) {
+        error: (connstatus: unknown) => {
           log.error(`KNX status: ${connstatus}`);
         },
       },
     });
 
     // read devices
-    this.devices.push(new WeatherAccessory(this, config));
+    this.devices.push(new WeatherAccessory(this, this.weatherConfig));
+    this.api.on('shutdown', () => this.shutdown());
 
-    log.info('finished initializing!');
+    log.info(`Initialized KNX Weather Station at ${this.weatherConfig.latitude}, ${this.weatherConfig.longitude}`);
   }
 
   accessories(callback: (foundAccessories: AccessoryPlugin[]) => void): void {
     callback(this.devices);
+  }
+
+  private shutdown(): void {
+    for (const device of this.devices) {
+      device.shutdown();
+    }
   }
 }

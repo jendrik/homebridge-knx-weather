@@ -1,36 +1,42 @@
-import { AccessoryPlugin, PlatformConfig, Service } from 'homebridge';
-
-import { PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_DISPLAY_NAME } from './settings.js';
-
-import { WeatherPlatform } from './platform.js';
-
+import { AccessoryPlugin, Service } from 'homebridge';
 import SunCalc from 'suncalc';
 
+import type { WeatherConfig } from './config.js';
+import { WeatherPlatform } from './platform.js';
+import {
+  ContactSensorActivity,
+  calculateSolarPhaseState,
+  type SolarPhaseStates,
+  type SolarTimes,
+} from './solar-phases.js';
+import { PLUGIN_DISPLAY_NAME, PLUGIN_NAME, PLUGIN_VERSION } from './settings.js';
+
+const MAX_UPDATE_DELAY_MS = 1000 * 60 * 60;
+const MIN_UPDATE_DELAY_MS = 1000;
 
 export class WeatherAccessory implements AccessoryPlugin {
-  private readonly uuid_base: string;
-  private readonly name: string;
   private readonly displayName: string;
 
   private readonly informationService: Service;
 
-  private readonly morningTwilightSensorService: Service; // nightEnd -> sunrise
-  private readonly daySensorService: Service; // sunrise -> sunset
-  private readonly eveningTwilightSensorService: Service; // sunset -> night
-  private readonly nightSensorService: Service; // night -> nightEnd
+  private readonly morningTwilightSensorService: Service;
+  private readonly daySensorService: Service;
+  private readonly eveningTwilightSensorService: Service;
+  private readonly nightSensorService: Service;
+
+  private updateTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly platform: WeatherPlatform,
-    private readonly config: PlatformConfig,
+    private readonly config: WeatherConfig,
   ) {
+    const name = 'Weather';
 
-    this.name = 'Weather';
-    this.uuid_base = platform.uuid.generate(PLUGIN_NAME + '-' + this.name);
-    this.displayName = this.uuid_base;
+    this.displayName = platform.uuid.generate(`${PLUGIN_NAME}-${name}`);
 
     this.informationService = new platform.Service.AccessoryInformation()
-      .setCharacteristic(platform.Characteristic.Name, this.name)
-      .setCharacteristic(platform.Characteristic.Identify, this.name)
+      .setCharacteristic(platform.Characteristic.Name, name)
+      .setCharacteristic(platform.Characteristic.Identify, name)
       .setCharacteristic(platform.Characteristic.Manufacturer, '@jendrik')
       .setCharacteristic(platform.Characteristic.Model, PLUGIN_DISPLAY_NAME)
       .setCharacteristic(platform.Characteristic.SerialNumber, this.displayName)
@@ -41,14 +47,7 @@ export class WeatherAccessory implements AccessoryPlugin {
     this.eveningTwilightSensorService = new platform.Service.ContactSensor('Evening Twilight', 'Evening Twilight');
     this.nightSensorService = new platform.Service.ContactSensor('Night', 'Night');
 
-    // update intervals now and every day
-    this.calculateEvents();
-    setInterval(
-      ()=> {
-        this.calculateEvents();
-      },
-      1000 * 60 * 60 * 24,
-    );
+    this.update();
   }
 
   getServices(): Service[] {
@@ -61,124 +60,89 @@ export class WeatherAccessory implements AccessoryPlugin {
     ];
   }
 
-  calculateEvents(): void {
+  shutdown(): void {
+    if (this.updateTimer !== undefined) {
+      clearTimeout(this.updateTimer);
+      this.updateTimer = undefined;
+    }
+  }
+
+  private update(): void {
     const now = new Date();
-    const times = SunCalc.getTimes(now, this.platform.latitude, this.platform.longitude);
+    const times = this.getSolarTimes(now);
+    const { states, nextUpdate } = calculateSolarPhaseState(now, times);
 
-    this.platform.log.info(`now: ${now}`);
-    this.platform.log.info(`sunrise: ${times.sunrise}`);
-    this.platform.log.info(`sunriseEnd: ${times.sunriseEnd}`);
-    this.platform.log.info(`goldenHourEnd: ${times.goldenHourEnd}`);
-    this.platform.log.info(`solarNoon: ${times.solarNoon}`);
-    this.platform.log.info(`goldenHour: ${times.goldenHour}`);
-    this.platform.log.info(`sunsetStart: ${times.sunsetStart}`);
-    this.platform.log.info(`sunset: ${times.sunset}`);
-    this.platform.log.info(`dusk: ${times.dusk}`);
-    this.platform.log.info(`nauticalDusk: ${times.nauticalDusk}`);
-    this.platform.log.info(`night: ${times.night}`);
-    this.platform.log.info(`nadir: ${times.nadir}`);
-    this.platform.log.info(`nightEnd: ${times.nightEnd}`);
-    this.platform.log.info(`nauticalDawn: ${times.nauticalDawn}`);
-    this.platform.log.info(`dawn: ${times.dawn}`);
+    this.platform.log.debug(JSON.stringify({
+      now: this.serializeDate(now),
+      times: this.serializeSolarTimes(times),
+      states,
+      nextUpdate: nextUpdate === undefined ? undefined : this.serializeDate(nextUpdate),
+    }));
 
-    // morning twilight (nightEnd -> sunrise)
-    if (now > times.nightEnd && now < times.sunrise) {
-      this.platform.log.info('currently morning twilight');
-      this.morningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-    } else if (now >= times.sunrise) {
-      this.platform.log.info('morning twilight already over');
-      this.morningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-    }
-    if (now < times.nightEnd) {
-      setTimeout(() => {
-        this.platform.log.info('morning twilight starting');
-        this.morningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-      }, times.nightEnd.getTime() - now.getTime());
-    }
-    if (now < times.sunrise) {
-      setTimeout(() => {
-        this.platform.log.info('morning twilight ending');
-        this.morningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-      }, times.sunrise.getTime() - now.getTime());
-    }
+    this.applyStates(states);
+    this.scheduleNextUpdate(now, nextUpdate);
+  }
 
-    // day (sunrise -> sunset)
-    if (now > times.sunrise && now < times.sunset) {
-      this.platform.log.info('currently day');
-      this.daySensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-    } else if (now >= times.sunset) {
-      this.platform.log.info('day already over');
-      this.daySensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-    }
-    if (now < times.sunrise) {
-      setTimeout(() => {
-        this.platform.log.info('day starting');
-        this.daySensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-      }, times.sunrise.getTime() - now.getTime());
-    }
-    if (now < times.sunset) {
-      setTimeout(() => {
-        this.platform.log.info('day ending');
-        this.daySensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-      }, times.sunset.getTime() - now.getTime());
-    }
+  private getSolarTimes(now: Date): SolarTimes {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
 
-    // evening twilight (sunset -> night)
-    if (now > times.sunset && now < times.night) {
-      this.platform.log.info('currently evening twilight');
-      this.eveningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-    } else if (now >= times.night) {
-      this.platform.log.info('evening twilight already over');
-      this.eveningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-    }
-    if (now < times.sunset) {
-      setTimeout(() => {
-        this.platform.log.info('evening twilight starting');
-        this.eveningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-      }, times.sunset.getTime() - now.getTime());
-    }
-    if (now < times.night) {
-      setTimeout(() => {
-        this.platform.log.info('evening twilight ending');
-        this.eveningTwilightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-      }, times.night.getTime() - now.getTime());
-    }
+    const todayTimes = SunCalc.getTimes(now, this.config.latitude, this.config.longitude);
+    const tomorrowTimes = SunCalc.getTimes(tomorrow, this.config.latitude, this.config.longitude);
 
-    // night (night -> nightEnd)
-    if (now > times.night) {
-      this.platform.log.info('currently night');
-      this.nightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-    } else if (now >= times.nightEnd && now < times.night) {
-      this.platform.log.info('night already over');
-      this.nightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-        .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-    }
-    if (now < times.night) {
-      setTimeout(() => {
-        this.platform.log.info('night starting');
-        this.nightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
-      }, times.night.getTime() - now.getTime());
-    }
-    if (now < times.nightEnd) {
-      setTimeout(() => {
-        this.platform.log.info('night ending');
-        this.nightSensorService.getCharacteristic(this.platform.Characteristic.ContactSensorState)
-          .updateValue(this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED);
-      }, times.nightEnd.getTime() - now.getTime());
-    }
+    return {
+      nightEnd: todayTimes.nightEnd,
+      sunrise: todayTimes.sunrise,
+      sunset: todayTimes.sunset,
+      night: todayTimes.night,
+      nextNightEnd: tomorrowTimes.nightEnd,
+    };
+  }
+
+  private applyStates(states: SolarPhaseStates): void {
+    this.updateContactSensor(this.morningTwilightSensorService, states.morningTwilight);
+    this.updateContactSensor(this.daySensorService, states.day);
+    this.updateContactSensor(this.eveningTwilightSensorService, states.eveningTwilight);
+    this.updateContactSensor(this.nightSensorService, states.night);
+  }
+
+  private updateContactSensor(service: Service, activity: ContactSensorActivity): void {
+    const state = activity === ContactSensorActivity.Active
+      ? this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
+      : this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED;
+
+    service.getCharacteristic(this.platform.Characteristic.ContactSensorState).updateValue(state);
+  }
+
+  private scheduleNextUpdate(now: Date, nextUpdate?: Date): void {
+    this.shutdown();
+
+    const delay = this.getUpdateDelay(now, nextUpdate);
+    this.updateTimer = setTimeout(() => {
+      this.update();
+    }, delay);
+  }
+
+  private getUpdateDelay(now: Date, nextUpdate?: Date): number {
+    const nextUpdateTime = nextUpdate?.getTime();
+    const rawDelay = nextUpdateTime !== undefined && Number.isFinite(nextUpdateTime)
+      ? nextUpdateTime - now.getTime()
+      : MAX_UPDATE_DELAY_MS;
+
+    return Math.max(MIN_UPDATE_DELAY_MS, Math.min(rawDelay, MAX_UPDATE_DELAY_MS));
+  }
+
+  private serializeSolarTimes(times: SolarTimes): Record<keyof SolarTimes, string> {
+    return {
+      nightEnd: this.serializeDate(times.nightEnd),
+      sunrise: this.serializeDate(times.sunrise),
+      sunset: this.serializeDate(times.sunset),
+      night: this.serializeDate(times.night),
+      nextNightEnd: this.serializeDate(times.nextNightEnd),
+    };
+  }
+
+  private serializeDate(date: Date): string {
+    return Number.isFinite(date.getTime()) ? date.toISOString() : 'Invalid Date';
   }
 }
