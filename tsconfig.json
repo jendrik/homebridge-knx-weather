@@ -5,7 +5,6 @@
       "DOM",
       "ES2022"
     ],
-    "rootDir": "src",
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "strict": true,
@@ -14,10 +13,12 @@
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
   },
   "include": [
     "eslint.config.js",
-    "src"
+    "src",
+    "test"
   ]
 }
