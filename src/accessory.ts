@@ -15,6 +15,8 @@ const MAX_UPDATE_DELAY_MS = 1000 * 60 * 60;
 const MIN_UPDATE_DELAY_MS = 1000;
 
 export class WeatherAccessory implements AccessoryPlugin {
+  public readonly name = 'Weather';
+
   private readonly displayName: string;
 
   private readonly informationService: Service;
@@ -30,12 +32,10 @@ export class WeatherAccessory implements AccessoryPlugin {
     private readonly platform: WeatherPlatform,
     private readonly config: WeatherConfig,
   ) {
-    const name = 'Weather';
-
-    this.displayName = platform.uuid.generate(`${PLUGIN_NAME}-${name}`);
+    this.displayName = platform.uuid.generate(`${PLUGIN_NAME}-${this.name}`);
 
     this.informationService = new platform.Service.AccessoryInformation()
-      .setCharacteristic(platform.Characteristic.Name, name)
+      .setCharacteristic(platform.Characteristic.Name, this.name)
       .setCharacteristic(platform.Characteristic.Manufacturer, '@jendrik')
       .setCharacteristic(platform.Characteristic.Model, PLUGIN_DISPLAY_NAME)
       .setCharacteristic(platform.Characteristic.SerialNumber, this.displayName)
@@ -128,11 +128,12 @@ export class WeatherAccessory implements AccessoryPlugin {
 
   private getUpdateDelay(now: Date, nextUpdate?: Date): number {
     const nextUpdateTime = nextUpdate?.getTime();
-    const rawDelay = nextUpdateTime !== undefined && Number.isFinite(nextUpdateTime)
-      ? nextUpdateTime - now.getTime()
-      : MAX_UPDATE_DELAY_MS;
 
-    return Math.max(MIN_UPDATE_DELAY_MS, Math.min(rawDelay, MAX_UPDATE_DELAY_MS));
+    if (nextUpdateTime === undefined || !Number.isFinite(nextUpdateTime)) {
+      return MAX_UPDATE_DELAY_MS;
+    }
+
+    return Math.max(MIN_UPDATE_DELAY_MS, nextUpdateTime - now.getTime());
   }
 
   private serializeSolarTimes(times: SolarTimes): Record<keyof SolarTimes, string> {
