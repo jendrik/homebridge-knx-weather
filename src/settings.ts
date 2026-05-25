@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { displayName, name, version } = require('../package.json') as {
+const { displayName, name, version } = require('../../package.json') as {
   displayName: string;
   name: string;
   version: string;

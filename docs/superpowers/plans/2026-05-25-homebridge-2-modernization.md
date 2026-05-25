@@ -999,7 +999,7 @@ npm test
 npm pack --dry-run
 ```
 
-Expected: all commands exit 0. `npm pack --dry-run` should include `dist/`, `README.md`, `LICENSE`, `package.json`, and `config.schema.json`; it should not include `docs/superpowers`.
+Expected: all commands exit 0. `npm pack --dry-run` should include `dist/src/`, `README.md`, `LICENSE`, `package.json`, and `config.schema.json`; it should not include `dist/test` or `docs/superpowers`.
 
 - [ ] **Step 3: Check for remaining Homebridge 1 or beta references**
 
