@@ -36,7 +36,6 @@ export class WeatherAccessory implements AccessoryPlugin {
 
     this.informationService = new platform.Service.AccessoryInformation()
       .setCharacteristic(platform.Characteristic.Name, name)
-      .setCharacteristic(platform.Characteristic.Identify, name)
       .setCharacteristic(platform.Characteristic.Manufacturer, '@jendrik')
       .setCharacteristic(platform.Characteristic.Model, PLUGIN_DISPLAY_NAME)
       .setCharacteristic(platform.Characteristic.SerialNumber, this.displayName)
@@ -58,6 +57,10 @@ export class WeatherAccessory implements AccessoryPlugin {
       this.eveningTwilightSensorService,
       this.nightSensorService,
     ];
+  }
+
+  identify(): void {
+    this.platform.log.info('Identify requested for KNX Weather Station');
   }
 
   shutdown(): void {

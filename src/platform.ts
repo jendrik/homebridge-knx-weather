@@ -53,5 +53,9 @@ export class WeatherPlatform implements StaticPlatformPlugin {
     for (const device of this.devices) {
       device.shutdown();
     }
+
+    this.connection.Disconnect(() => {
+      this.log.debug('KNX disconnected');
+    });
   }
 }
