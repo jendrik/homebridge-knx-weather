@@ -43,9 +43,15 @@ Edit `package.json` so the relevant sections are:
 ```json
 {
   "engines": {
-    "node": "^22.12.0 || ^24.0.0",
+    "node": "^22.13.0 || ^24.0.0",
     "homebridge": "^2.0.0"
   },
+  "files": [
+    "dist",
+    "config.schema.json",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "rimraf ./dist && tsc",
     "lint": "eslint . --max-warnings=0",
@@ -886,7 +892,7 @@ This plugin is HomeKit-only. It does not expose Matter accessories.
 ## Requirements
 
 - [Homebridge](https://homebridge.io) v2.0.0 or later
-- Node.js v22.12.0 or later, or Node.js v24.0.0 or later
+- Node.js v22.13.0 or later, or Node.js v24.0.0 or later
 - A KNX IP router or interface
 
 ## Installation
@@ -993,7 +999,7 @@ npm test
 npm pack --dry-run
 ```
 
-Expected: all commands exit 0. `npm pack --dry-run` should include `dist/`, `README.md`, `LICENSE`, `package.json`, `config.schema.json`, and source files only if npm defaults include them.
+Expected: all commands exit 0. `npm pack --dry-run` should include `dist/`, `README.md`, `LICENSE`, `package.json`, and `config.schema.json`; it should not include `docs/superpowers`.
 
 - [ ] **Step 3: Check for remaining Homebridge 1 or beta references**
 

@@ -26,7 +26,7 @@ This is preferred over a full dynamic-platform rewrite because the plugin has on
 ## Package And Tooling
 
 - Set `engines.homebridge` to `^2.0.0`.
-- Set `engines.node` to the Homebridge 2-supported Node range: `^22.12.0 || ^24.0.0`.
+- Set `engines.node` to the Homebridge 2-supported Node range and current tooling floor: `^22.13.0 || ^24.0.0`.
 - Update `homebridge` dev dependency from beta to the current stable Homebridge 2 release.
 - Update TypeScript, ESLint, `typescript-eslint`, Node typings, and existing helper tools to compatible current versions.
 - Keep ESM output with `module` and `moduleResolution` set to `nodenext`.
@@ -110,7 +110,7 @@ CI should run the same gates on Node 22 and Node 24.
 Update the README to state:
 
 - Homebridge 2.x is required.
-- Node.js 22.12+ or 24+ is required.
+- Node.js 22.13+ or 24+ is required.
 - The plugin remains HomeKit-only.
 - Active phase sensors report `CONTACT_NOT_DETECTED`.
 
