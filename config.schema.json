@@ -11,8 +11,11 @@
     },
     "port": {
       "title": "KNX Port",
-      "type": "string",
-      "placeholder": "3671",
+      "type": "number",
+      "default": 3671,
+      "minimum": 1,
+      "maximum": 65535,
+      "placeholder": 3671,
       "description": "KNX Port"
     },
     "latitude": {
