@@ -23,22 +23,21 @@ export interface SolarPhaseStateResult {
   nextUpdate?: Date;
 }
 
-export function calculateSolarPhaseState(now: Date, times: SolarTimes): SolarPhaseStateResult {
-  const nowTime = now.getTime();
-
-  return {
-    states: {
-      morningTwilight: activityBetween(nowTime, times.nightEnd, times.sunrise),
-      day: activityBetween(nowTime, times.sunrise, times.sunset),
-      eveningTwilight: activityBetween(nowTime, times.sunset, times.night),
-      night: activityBetween(nowTime, times.night, times.nextNightEnd),
-    },
-    nextUpdate: nextUpdateAfter(nowTime, times),
-  };
+function isValidDate(date: Date): boolean {
+  return Number.isFinite(date.getTime());
 }
 
 function activityBetween(nowTime: number, start: Date, end: Date): ContactSensorActivity {
-  return nowTime >= start.getTime() && nowTime < end.getTime()
+  return isValidDate(start) && isValidDate(end) && nowTime >= start.getTime() && nowTime < end.getTime()
+    ? ContactSensorActivity.Active
+    : ContactSensorActivity.Inactive;
+}
+
+function nightActivity(nowTime: number, times: SolarTimes): ContactSensorActivity {
+  const beforeNightEnd = isValidDate(times.nightEnd) && nowTime < times.nightEnd.getTime();
+  const afterNightStart = activityBetween(nowTime, times.night, times.nextNightEnd) === ContactSensorActivity.Active;
+
+  return beforeNightEnd || afterNightStart
     ? ContactSensorActivity.Active
     : ContactSensorActivity.Inactive;
 }
@@ -52,5 +51,21 @@ function nextUpdateAfter(nowTime: number, times: SolarTimes): Date | undefined {
     times.nextNightEnd,
   ];
 
-  return boundaries.find((boundary) => boundary.getTime() > nowTime);
+  return boundaries
+    .filter((boundary) => isValidDate(boundary) && boundary.getTime() > nowTime)
+    .sort((left, right) => left.getTime() - right.getTime())[0];
+}
+
+export function calculateSolarPhaseState(now: Date, times: SolarTimes): SolarPhaseStateResult {
+  const nowTime = now.getTime();
+
+  return {
+    states: {
+      morningTwilight: activityBetween(nowTime, times.nightEnd, times.sunrise),
+      day: activityBetween(nowTime, times.sunrise, times.sunset),
+      eveningTwilight: activityBetween(nowTime, times.sunset, times.night),
+      night: nightActivity(nowTime, times),
+    },
+    nextUpdate: nextUpdateAfter(nowTime, times),
+  };
 }

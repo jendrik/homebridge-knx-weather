@@ -47,14 +47,56 @@ test('night is active before next night end', () => {
   assert.deepEqual(result.nextUpdate, solarTimes.nextNightEnd);
 });
 
-test('all phases are inactive before night end', () => {
+test('night is active before night end', () => {
   const result = calculateSolarPhaseState(new Date('2026-05-25T02:00:00.000Z'), solarTimes);
 
   assert.deepEqual(result.states, {
     morningTwilight: ContactSensorActivity.Inactive,
     day: ContactSensorActivity.Inactive,
     eveningTwilight: ContactSensorActivity.Inactive,
-    night: ContactSensorActivity.Inactive,
+    night: ContactSensorActivity.Active,
   });
   assert.deepEqual(result.nextUpdate, solarTimes.nightEnd);
+});
+
+test('phase boundaries are half-open intervals', () => {
+  const atNightEnd = calculateSolarPhaseState(solarTimes.nightEnd, solarTimes);
+  const atSunrise = calculateSolarPhaseState(solarTimes.sunrise, solarTimes);
+  const atSunset = calculateSolarPhaseState(solarTimes.sunset, solarTimes);
+  const atNight = calculateSolarPhaseState(solarTimes.night, solarTimes);
+  const atNextNightEnd = calculateSolarPhaseState(solarTimes.nextNightEnd, solarTimes);
+
+  assert.equal(atNightEnd.states.night, ContactSensorActivity.Inactive);
+  assert.equal(atNightEnd.states.morningTwilight, ContactSensorActivity.Active);
+  assert.equal(atSunrise.states.morningTwilight, ContactSensorActivity.Inactive);
+  assert.equal(atSunrise.states.day, ContactSensorActivity.Active);
+  assert.equal(atSunset.states.day, ContactSensorActivity.Inactive);
+  assert.equal(atSunset.states.eveningTwilight, ContactSensorActivity.Active);
+  assert.equal(atNight.states.eveningTwilight, ContactSensorActivity.Inactive);
+  assert.equal(atNight.states.night, ContactSensorActivity.Active);
+  assert.equal(atNextNightEnd.states.night, ContactSensorActivity.Inactive);
+  assert.equal(atNextNightEnd.nextUpdate, undefined);
+});
+
+test('invalid boundaries are ignored for phases and next update', () => {
+  const invalidTimes: SolarTimes = {
+    nightEnd: new Date(Number.NaN),
+    sunrise: solarTimes.sunrise,
+    sunset: solarTimes.sunset,
+    night: new Date(Number.NaN),
+    nextNightEnd: new Date(Number.NaN),
+  };
+
+  const beforeSunrise = calculateSolarPhaseState(new Date('2026-05-25T02:00:00.000Z'), invalidTimes);
+  const atNoon = calculateSolarPhaseState(new Date('2026-05-25T12:00:00.000Z'), invalidTimes);
+
+  assert.deepEqual(beforeSunrise.states, {
+    morningTwilight: ContactSensorActivity.Inactive,
+    day: ContactSensorActivity.Inactive,
+    eveningTwilight: ContactSensorActivity.Inactive,
+    night: ContactSensorActivity.Inactive,
+  });
+  assert.deepEqual(beforeSunrise.nextUpdate, solarTimes.sunrise);
+  assert.equal(atNoon.states.day, ContactSensorActivity.Active);
+  assert.deepEqual(atNoon.nextUpdate, solarTimes.sunset);
 });
