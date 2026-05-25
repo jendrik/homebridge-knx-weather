@@ -5,7 +5,6 @@
       "DOM",
       "ES2022"
     ],
-    "rootDir": "src",
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "strict": true,
@@ -19,6 +18,7 @@
   },
   "include": [
     "eslint.config.js",
-    "src"
+    "src",
+    "test"
   ]
 }
